@@ -1,4 +1,6 @@
-# MCP Tool-Using Agent
+# AgentBridge
+
+### MCP-Powered AI Assistant
 
 A conversational AI agent that can search the web, fetch pages, and work with files through the **Model Context Protocol (MCP)**. Built with **LangGraph**, **FastAPI**, and **langchain-mcp-adapters**, with session-based conversation memory and a browser chat interface. Deployed on **Google Cloud Run**.
 
@@ -61,8 +63,8 @@ Additional diagrams: [tool invocation flow](docs/diagrams/tool-invocation-flow.p
 ### Install and configure
 
 ```bash
-git clone https://github.com/Sujendra-23/mcp-tool-using-agent.git
-cd mcp-tool-using-agent
+git clone https://github.com/Sujendra-23/agentbridge-mcp.git
+cd agentbridge-mcp
 
 python3 -m venv .venv
 source .venv/bin/activate
@@ -164,11 +166,11 @@ The application returns JSON for handled failures: `400` for blank queries or se
 ## Run with Docker
 
 ```bash
-docker build -t mcp-tool-using-agent .
+docker build -t agentbridge-mcp .
 docker run --rm -p 8080:8080 --env-file .env \
   -e MCP_FILESYSTEM_ROOT=/app/mcp_workspace \
   -e MCP_SERVERS_CONFIG=/app/mcp_config.json \
-  mcp-tool-using-agent
+  agentbridge-mcp
 ```
 
 The image runs as a non-root user. Credentials are supplied at runtime through the environment.
@@ -201,7 +203,7 @@ Cloud Run, Cloud Build, image storage, model requests, and Tavily usage may incu
 ## Project structure
 
 ```text
-mcp-tool-using-agent/
+agentbridge-mcp/
 ├── main.py                         # FastAPI routes, agent, memory, and MCP integration
 ├── web_test.html                   # Browser chat client
 ├── mcp_config.json                 # MCP server commands and environment substitution
