@@ -1,0 +1,33 @@
+{
+  "filesystem": {
+    "transport": "stdio",
+    "command": "npx",
+    "args": ["-y", "--quiet", "@modelcontextprotocol/server-filesystem", "${MCP_FILESYSTEM_ROOT}"],
+    "env": {
+      "NO_UPDATE_NOTIFIER": "1",
+      "npm_config_update_notifier": "false",
+      "npm_config_fund": "false",
+      "npm_config_audit": "false"
+    },
+    "_comment": "Reads/writes files under MCP_FILESYSTEM_ROOT. The npm_config_* vars silence npm's update-notifier banner, which otherwise prints to stdout and corrupts the JSON-RPC stream over stdio."
+  },
+  "tavily": {
+    "transport": "stdio",
+    "command": "npx",
+    "args": ["-y", "--quiet", "tavily-mcp@latest"],
+    "env": {
+      "TAVILY_API_KEY": "${TAVILY_API_KEY}",
+      "NO_UPDATE_NOTIFIER": "1",
+      "npm_config_update_notifier": "false",
+      "npm_config_fund": "false",
+      "npm_config_audit": "false"
+    },
+    "_comment": "Official Tavily web search server (tavily-ai/tavily-mcp). Exposes tavily_search, tavily_extract, tavily_crawl, tavily_map, tavily_research."
+  },
+  "fetch": {
+    "transport": "stdio",
+    "command": "python3",
+    "args": ["-m", "mcp_server_fetch"],
+    "_comment": "Additional MCP server (modelcontextprotocol/servers reference implementation). Retrieves a single known URL's content -- complements tavily_search, which is for query-based discovery rather than a specific link."
+  }
+}

@@ -1,0 +1,25 @@
+flowchart TB
+    subgraph Local["Local development"]
+        EnvFile[".env<br/>(OPENAI_API_KEY, TAVILY_API_KEY,<br/>GCP_PROJECT_ID, ...)"]
+        Dev["python main.py<br/>(same OpenAI/NIM backend as prod)"]
+        EnvFile -.->|"load_dotenv()"| Dev
+    end
+
+    subgraph Build["Build & push"]
+        CB["gcloud builds submit<br/>(Cloud Build)"]
+        AR["Artifact Registry<br/>gcr.io/PROJECT/csci599-a1"]
+        Image["Docker image<br/>Python + Node.js + application"]
+        CB --> Image --> AR
+    end
+
+    subgraph Deploy["Cloud Run"]
+        CR["Cloud Run service<br/>csci599-a1<br/>(us-west1, scale-to-zero,<br/>max-instances=1)"]
+        URL(["Live URL<br/>https://csci599-a1-xxxx-uw.a.run.app"])
+        CR --> URL
+    end
+
+    EnvFile -->|"set -a; source .env<br/>(deploy.sh)"| Shell["shell env vars"]
+    Shell -->|"--set-env-vars<br/>OPENAI_API_KEY=...,TAVILY_API_KEY=...,<br/>MCP_SERVERS_CONFIG=/app/mcp_config.json"| CR
+
+    Dev -.->|"application source + Dockerfile"| CB
+    AR --> CR

@@ -1,0 +1,9 @@
+flowchart TD
+    Start(["User query arrives<br/>at agent entry"]) --> Reason["LLM reasoning step<br/>(decide: answer directly,<br/>or call a tool?)"]
+    Reason -->|"no tool needed"| Final(["Final response<br/>synthesized"])
+    Reason -->|"tool needed"| Select["Tool selection<br/>(filesystem / tavily_* / fetch)"]
+    Select --> Call["MCP tools/call request<br/>(via MultiServerMCPClient)"]
+    Call --> Resp["MCP server response<br/>(result content, or isError)"]
+    Resp --> Synth["LLM synthesis step<br/>(incorporate tool result)"]
+    Synth -->|"another tool call<br/>is needed"| Reason
+    Synth -->|"enough to answer"| Final

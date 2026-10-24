@@ -1,0 +1,12 @@
+flowchart TB
+    Client["HTTP client<br/>(curl / grader)"] -->|"POST /chat<br/>{query, session_id}"| API["FastAPI<br/>POST /chat"]
+    API --> Agent["LangGraph agent<br/>(create_react_agent state graph)"]
+    Agent <-->|"read / write state<br/>keyed by thread_id=session_id"| CP[("MemorySaver<br/>checkpointer")]
+    Agent <-->|"chat completions"| LLM["LLM backend<br/>OpenAI GPT-5<br/>(or NVIDIA NIM via OPENAI_BASE_URL)"]
+    Agent <-->|"get_tools() /<br/>LangChain BaseTool calls"| MCPClient["MCP client wrapper<br/>MultiServerMCPClient<br/>(langchain-mcp-adapters)"]
+
+    MCPClient <-->|"stdio JSON-RPC<br/>tools/list, tools/call"| FS["filesystem MCP server<br/>@modelcontextprotocol/server-filesystem<br/>(npx, stdio)"]
+    MCPClient <-->|"stdio JSON-RPC<br/>tools/list, tools/call"| TAV["Tavily MCP server<br/>tavily-mcp<br/>(npx, stdio)"]
+    MCPClient <-->|"stdio JSON-RPC<br/>tools/list, tools/call"| FETCH["fetch MCP server<br/>mcp-server-fetch<br/>(python -m, stdio)"]
+
+    API -->|"{response}"| Client

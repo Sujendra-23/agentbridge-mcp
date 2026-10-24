@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.pyc
+mcp_workspace/*
+!mcp_workspace/.gitkeep
+*.egg-info/
+.DS_Store
+.rocketride/
+.claude/
+.github/copilot-instructions.md

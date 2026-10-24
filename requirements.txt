@@ -1,0 +1,9 @@
+fastapi==0.143.0
+uvicorn[standard]==0.54.0
+langgraph==1.2.14
+langchain-mcp-adapters==0.3.2
+langchain-openai==1.7.1
+langchain-core==1.6.10
+python-dotenv==1.2.4
+mcp-server-fetch==2026.10.10
+pydantic==2.14.1

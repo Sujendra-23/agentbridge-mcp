@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+.git/
+server.log
+scratch_*.py
+.DS_Store
+.rocketride/
+.claude/
+.github/copilot-instructions.md
+mcp_workspace/*
+!mcp_workspace/.gitkeep
