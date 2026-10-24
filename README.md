@@ -2,11 +2,13 @@
 
 ### MCP-Powered AI Assistant
 
+[![Scenario tests](https://github.com/Sujendra-23/agentbridge-mcp/actions/workflows/scenario-tests.yml/badge.svg)](https://github.com/Sujendra-23/agentbridge-mcp/actions/workflows/scenario-tests.yml)
+
 A conversational AI agent that can search the web, fetch pages, and work with files through the **Model Context Protocol (MCP)**. Built with **LangGraph**, **FastAPI**, and **langchain-mcp-adapters**, with session-based conversation memory and a browser chat interface. Deployed on **Google Cloud Run**.
 
 **[Try the live demo](https://csci599-a1-gtewxoepna-uw.a.run.app/test)** · **[API documentation](https://csci599-a1-gtewxoepna-uw.a.run.app/docs)** · **[Service health](https://csci599-a1-gtewxoepna-uw.a.run.app/health)**
 
-Originally developed for CSCI 599, Assignment 1: Tool-Using Agent with MCP Integration.
+**Engineering evidence:** 28 automated scenario tests cover real MCP tool execution, concurrent conversation isolation, filesystem access boundaries, and recovery from dependency failures. [See the scenarios and results](docs/testing.md).
 
 ## Features
 
@@ -50,6 +52,41 @@ Originally developed for CSCI 599, Assignment 1: Tool-Using Agent with MCP Integ
 The filesystem workspace is shared across sessions; conversation history is keyed by session ID.
 
 Additional diagrams: [tool invocation flow](docs/diagrams/tool-invocation-flow.png) · [deployment topology](docs/diagrams/deployment-topology.png). Editable Mermaid sources are included in [docs/diagrams](docs/diagrams).
+
+## Real-world scenario tests
+
+The suite exercises an on-call incident workflow and the failures that can interrupt it. **Latest local validation: 28 passed** on Python 3.13.9, with 15 service tests and 13 MCP integration tests. GitHub Actions runs the suite on pushes and pull requests and retains a JUnit report.
+
+| Scenario | What the tests verify |
+| --- | --- |
+| Incident research → runbook → saved handoff | A local search MCP server returns a URL; the reference fetch server retrieves it; the official filesystem server writes and reads back the exact fetched content, preserving the source URL and Unicode. |
+| Concurrent support conversations | 12 overlapping conversations make 24 HTTP requests; each recalls its own incident code, with four messages in its checkpoint and no other conversation's user messages. |
+| Workspace escape attempts | Six real filesystem calls attempt reads and writes through absolute paths, `../` traversal, and symlinks. Every attempt returns a tool error; the outside file remains unchanged and its contents are not returned. |
+| Research dependency unavailable | A real MCP subprocess exits or hangs during discovery. Health reports the failure, while a healthy filesystem server still handles a chat-initiated write. |
+| Missing handoff file | A real read returns a tool error; the graph receives it and completes a recovery write in the same invocation. |
+| Slow or broken agent invocation | A deadline cancels the stalled test invocation, resets request context, and permits the next chat. Provider exceptions and malformed results produce JSON errors without exposing backend exception details. |
+| Private URL retrieval | The production fetch arguments retain the server's default loopback protection; a fetch attempt is rejected before contacting the local HTTP fixture. |
+| Deployment configuration and state boundaries | Quoted environment values remain intact; tool traces omit argument values; conversations lose memory after state replacement; separate sessions can intentionally share workspace files. |
+
+**Test boundary:** FastAPI, LangGraph, its in-memory checkpointer, MCP stdio transport, and filesystem/fetch subprocesses run for real. Model decisions are scripted locally, and the search server is a controlled fixture. These tests verify orchestration and failure handling; they do not measure live LLM reasoning, Tavily search quality, production throughput, or deployed Cloud Run behavior. No API keys are required, and tests do not load `.env`.
+
+```bash
+source .venv/bin/activate
+pip install -r requirements-dev.txt
+
+# Full suite: Python 3.13 plus Node.js 24+/npm; initial npx download needs internet.
+python -m pytest -q --junitxml=test-results/scenarios.xml
+
+# Fast service checks without MCP subprocesses.
+python -m pytest -q -m 'not integration'
+
+# Real MCP integration scenarios only.
+python -m pytest -q -m integration
+```
+
+The test filesystem server is pinned to `@modelcontextprotocol/server-filesystem@2.0.0`; fetch uses the pinned Python dependency. Temporary workspaces and an ephemeral loopback HTTP fixture keep tests independent of user files and public websites. Production's npm server versions remain unpinned, so dependency upgrades should be validated separately.
+
+The suite exposed and drove fixes for raw exception disclosure in HTTP error responses, configuration substitution that broke on quotes/backslashes/newlines, and incomplete handling of malformed agent results. [Testing notes](docs/testing.md) include reproduction commands, evidence, and design tradeoffs to discuss in a technical walkthrough.
 
 ## Quick start
 
@@ -161,7 +198,7 @@ curl -X POST https://csci599-a1-gtewxoepna-uw.a.run.app/chat \
 
 ### Error responses
 
-The application returns JSON for handled failures: `400` for blank queries or session IDs, `422` for invalid request schemas, `503` before agent initialization, `504` for invocation timeouts, and `500` for processing failures. Tool discovery failures are recorded per server so the agent can initialize with the tools that remain available.
+The application returns JSON for handled failures: `400` for blank queries or session IDs, `422` for invalid request schemas, `503` before agent initialization, `504` for invocation timeouts, and `500` for processing failures. Chat error responses omit raw exception details; diagnostics remain in server logs. Tool discovery failures are recorded per server so the agent can initialize with the tools that remain available.
 
 ## Run with Docker
 
@@ -208,6 +245,11 @@ agentbridge-mcp/
 ├── web_test.html                   # Browser chat client
 ├── mcp_config.json                 # MCP server commands and environment substitution
 ├── requirements.txt                # Pinned Python dependencies
+├── requirements-dev.txt            # Test dependencies
+├── pytest.ini                      # Async test configuration and integration marker
+├── tests/                          # Service scenarios and real MCP subprocess tests
+│   └── fixtures/research_server.py  # Controlled search server and startup fault modes
+├── .github/workflows/              # Scenario tests and JUnit artifacts in CI
 ├── Dockerfile                      # Multi-stage container build
 ├── deploy.sh                       # Cloud Build and Cloud Run deployment
 ├── .env.example                    # Configuration template without credentials
@@ -215,7 +257,9 @@ agentbridge-mcp/
 ├── .dockerignore                   # Excludes local files from the Docker build context
 ├── mcp_workspace/
 │   └── .gitkeep                     # Keeps the initial workspace directory in Git
-└── docs/diagrams/                   # Architecture PNGs and Mermaid sources
+└── docs/
+    ├── testing.md                  # Verified results, test boundaries, design tradeoffs
+    └── diagrams/                   # Architecture PNGs and Mermaid sources
 ```
 
 ## MCP server attribution
@@ -225,3 +269,5 @@ This project integrates existing MCP servers rather than reimplementing them:
 - [Filesystem MCP server](https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem)
 - [Tavily MCP server](https://github.com/tavily-ai/tavily-mcp)
 - [Fetch MCP server](https://github.com/modelcontextprotocol/servers/tree/main/src/fetch)
+
+Originally developed for CSCI 599, Assignment 1: Tool-Using Agent with MCP Integration.

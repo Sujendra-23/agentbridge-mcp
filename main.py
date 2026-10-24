@@ -79,14 +79,24 @@ def _load_mcp_server_config() -> dict[str, dict[str, Any]]:
     """Read the MCP server manifest and substitute ${VAR} with environment values."""
     config_path = os.environ.get("MCP_SERVERS_CONFIG", "./mcp_config.json")
     with open(config_path, encoding="utf-8") as f:
-        raw = f.read()
+        raw_config = json.load(f)
 
     def _sub(match: re.Match) -> str:
         var_name = match.group(1)
         return os.environ.get(var_name, "")
 
-    substituted = re.sub(r"\$\{([A-Z_][A-Z0-9_]*)\}", _sub, raw)
-    full_config: dict[str, dict[str, Any]] = json.loads(substituted)
+    def _substitute(value: Any) -> Any:
+        # Substitute after parsing so quotes, backslashes, and newlines in an
+        # environment value remain data rather than corrupting the JSON syntax.
+        if isinstance(value, str):
+            return re.sub(r"\$\{([A-Z_][A-Z0-9_]*)\}", _sub, value)
+        if isinstance(value, list):
+            return [_substitute(item) for item in value]
+        if isinstance(value, dict):
+            return {key: _substitute(item) for key, item in value.items()}
+        return value
+
+    full_config: dict[str, dict[str, Any]] = _substitute(raw_config)
 
     # Only pass through keys langchain-mcp-adapters' StdioConnection understands;
     # drop our own documentation-only "_comment" field.
@@ -277,7 +287,7 @@ async def chat(req: ChatRequest):
             status_code=504,
             content={"response": f"The agent took longer than {AGENT_INVOKE_TIMEOUT_SECONDS}s to respond. Please try again."},
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception:  # noqa: BLE001
         # Failure modes 2 & 3: a tool executed but raised, or the LLM/MCP layer
         # returned something the graph couldn't parse. Either way, the service
         # must respond, not crash or leak a raw stack trace to the caller.
@@ -289,7 +299,6 @@ async def chat(req: ChatRequest):
                     "Something went wrong while processing that request. "
                     "The error has been logged; please try again."
                 ),
-                "error": str(exc)[:500],
             },
         )
     finally:
@@ -303,11 +312,11 @@ async def chat(req: ChatRequest):
             content = "".join(
                 block.get("text", "") if isinstance(block, dict) else str(block) for block in content
             )
-    except (KeyError, IndexError, AttributeError) as exc:
+    except (KeyError, IndexError, AttributeError, TypeError):
         logger.exception("Could not parse agent result for session_id=%s", req.session_id)
         return JSONResponse(
             status_code=500,
-            content={"response": "The agent returned an unexpected result shape.", "error": str(exc)[:500]},
+            content={"response": "The agent returned an unexpected result shape."},
         )
 
     logger.info("Agent completed session_id=%s", req.session_id)
@@ -319,7 +328,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     """Last-resort safety net so no request can crash the process or return a
     bare, unhandled 500 with a stack trace."""
     logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
-    return JSONResponse(status_code=500, content={"response": "Internal server error.", "error": str(exc)[:300]})
+    return JSONResponse(status_code=500, content={"response": "Internal server error."})
 
 
 if __name__ == "__main__":
